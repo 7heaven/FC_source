@@ -1,0 +1,1976 @@
+<HTML><HEAD><TITLE>65C02</TITLE>
+<META content="text/html; charset=gb2312" http-equiv=Content-Type>
+<META content="MSHTML 5.00.2614.3500" name=GENERATOR>
+</HEAD>
+<BODY>
+<DIV class=Section1>
+<H1 style="COLOR: #003366">65C02</H1>
+<P align=right>（pinokio 译、编 2002-6-17） 
+<OL type=1>
+  <LI><A href="#GeneralDescription">概要</A> 
+
+  <LI><A href="#InstructionSet">指令集</A> 
+  <LI><A href="#AddressingModes">寻址模式</A> 
+  <LI><A 
+  href="#InstructionEncodings">指令编码</A> 
+  </LI></OL>
+<H2><A name=GeneralDescription>概要</A></H2>
+<P>65C02有16位（64K）的地址空间分成256个页面，每个256字节。<BR>0 
+页面($0000-$00FF)有一些很特别的性质，例如寻址模式，它是非常重要的。<BR>1 
+页面($0100-$01FF)是堆栈。<BR>$FFFA-$FFFB字节是NMIB中断向量。<BR>$FFFC-$FFFD字节是复位向量。<BR>$FFFE-$FFFF字节是IRQ/BRK向量。 
+
+<P>65C02有3个寄存器，栈指针，标志位（P）和计数器。寄存器是累加器(A)，X变址寄存器，和Y变址寄存器，每一个都是8位的，大多数指令把结果留在累加器里；栈指针是一个8位的寄存器用来指示栈（1 
+页面）的偏移量，当使用push和pull指令时它自动增加和减少，你也可以用TSX和TXS指令直接访问和修改它的值。P标志包含下面这些占用1个位的标志： 
+<TABLE border=1 cellPadding=0 cellSpacing=0>
+  <TBODY>
+  <TR>
+    <TD>标志 
+    <TD>名称 
+    <TD>作用 
+  <TR>
+    <TD>N 
+    <TD>符号Negative 
+    <TD>当操作结果高位被设置（为负），该位被设置，否则被清除 
+  <TR>
+    <TD>V 
+    <TD><SPAN lang=EN-US>溢出Overflow </SPAN>
+    <TD><SPAN lang=EN-US>当操作发生借位或进位时，该位被设置 </SPAN>
+  <TR>
+    <TD>B 
+    <TD><SPAN lang=EN-US>中断Break </SPAN>
+    <TD><SPAN lang=EN-US>遇到‘BRK’指令时，该位被设置 </SPAN>
+  <TR>
+    <TD>D 
+    <TD><SPAN lang=EN-US>十进制Decimal </SPAN>
+    <TD><SPAN lang=EN-US>当该位被设置时，所以的算术操作都是BCD 
+      (例如：09+01=10)。当该位被清除时，所有的算术操作都是以二为补码的二进制 (例如： 09+01=0A) </SPAN>
+  <TR>
+    <TD>I 
+    <TD><SPAN lang=EN-US>中断禁止Interrupt Disable </SPAN>
+    <TD><SPAN lang=EN-US>当该位被设置时，不会发生中断 </SPAN>
+  <TR>
+    <TD>Z 
+    <TD><SPAN lang=EN-US>零Zero </SPAN>
+    <TD><SPAN lang=EN-US>当操作结果为零时，该位被设置。否则被清除 </SPAN>
+  <TR>
+    <TD>C 
+    <TD><SPAN lang=EN-US>进位Carry </SPAN>
+    <TD><SPAN lang=EN-US>当发生进位时，该位被设置 </SPAN></TR></TBODY></TABLE><SPAN lang=EN-US>
+<P>这些位按这个顺序排列(从7 [最高]到0 [最低])： NV-BDIZC&nbsp; 
+<H2><A name=InstructionSet>指令集</A></H2>
+<TABLE border=1 cellPadding=0 
+style="WIDTH: 100%; mso-cellspacing: 1.5pt; mso-padding-alt: 0cm 0cm 0cm 0cm" 
+width="100%">
+  <TBODY>
+  <TR>
+    <TD>
+      <P align=center style="TEXT-ALIGN: center"><B>助记符</B> </P>
+    <TD>
+      <P align=center style="TEXT-ALIGN: center"><B>描述</B></P>
+    <TD>
+      <P align=center style="TEXT-ALIGN: center"><B>表达式</B></P>
+    <TD>
+      <P align=center style="TEXT-ALIGN: center"><B>标志</B> </P>
+  <TR>
+    <TD colSpan=4>
+      <P align=center style="TEXT-ALIGN: center"><B>读取（load）&amp;储存（store）指令</B> 
+      </P>
+  <TR>
+    <TD>LDA
+    <TD>load accumulator将数据读入累加器
+    <TD>A&lt;--M
+    <TD>NZ 
+  <TR>
+    <TD>LDX
+    <TD>load X index将数据读入变址寄存器X
+    <TD>X&lt;--M
+    <TD>NZ 
+  <TR>
+    <TD>LDY
+    <TD>load Y index将数据读入变址寄存器Y
+    <TD>Y&lt;--M
+    <TD>NZ 
+  <TR>
+    <TD>STA
+    <TD>store accumulator储存累加器的数据
+    <TD>M&lt;--A
+    <TD>- 
+  <TR>
+    <TD>STX
+    <TD>store X index储存变址寄存器X的数据
+    <TD>M&lt;--A
+    <TD>- 
+  <TR>
+    <TD>STY
+    <TD>store Y index储存变址寄存器Y的数据
+    <TD>M&lt;--A
+    <TD>- 
+  <TR>
+    <TD>STZ
+    <TD>store zero储存零
+    <TD>M&lt;--0
+    <TD>- 
+  <TR>
+    <TD colSpan=4>
+      <P align=center style="TEXT-ALIGN: center"><B>堆栈操作</B> </P>
+  <TR>
+    <TD>PHA
+    <TD>push accumulator累加器入栈
+    <TD>Stack&lt;--A
+    <TD>- 
+  <TR>
+    <TD>PHX
+    <TD>push X index变址寄存器X入栈
+    <TD>Stack&lt;--X
+    <TD>- 
+  <TR>
+    <TD>PHY
+    <TD>push Y index变址寄存器Y入栈
+    <TD>Stack&lt;--Y
+    <TD>- 
+  <TR>
+    <TD>PHP
+    <TD>push processor flags 标志位P入栈
+    <TD>Stack&lt;--P
+    <TD>- 
+  <TR>
+    <TD>PLA
+    <TD>pull (pop) accumulator累加器出栈
+    <TD>A&lt;--Stack
+    <TD>NZ 
+  <TR>
+    <TD>PLX
+    <TD>pull (pop) X index变址寄存器X出栈
+    <TD>X&lt;--Stack
+    <TD>NZ 
+  <TR>
+    <TD>PLY
+    <TD>pull (pop) Y index变址寄存器Y出栈
+    <TD>Y&lt;--Stack
+    <TD>NZ 
+  <TR>
+    <TD>PLP
+    <TD>pull (pop) processor flags标志位P出栈
+    <TD>P&lt;--Stack
+    <TD>All 
+  <TR>
+    <TD>TSX
+    <TD>transfer stack pointer to X传送栈指针到X
+    <TD>X&lt;--S
+    <TD>NZ 
+  <TR>
+    <TD>TXS
+    <TD>transfer X to stack pointer传送X到栈指针
+    <TD>S&lt;--X
+    <TD>- 
+  <TR>
+    <TD colSpan=4>
+      <P align=center 
+      style="TEXT-ALIGN: center"><B>递增（increment）&amp;递减（decrement）操作</B> </P>
+  <TR>
+    <TD>INA
+    <TD>increment accumulator累加器递增
+    <TD>A++
+    <TD>NZ 
+  <TR>
+    <TD>INX
+    <TD>increment X index变址寄存器X递增
+    <TD>X++
+    <TD>NZ 
+  <TR>
+    <TD>INY
+    <TD>increment Y index变址寄存器Y递增
+    <TD>Y++
+    <TD>NZ 
+  <TR>
+    <TD>DEA
+    <TD>decrement accumulator累加器递减
+    <TD>A--
+    <TD>NZ 
+  <TR>
+    <TD>DEX
+    <TD>decrement X index变址寄存器X递减
+    <TD>X--
+    <TD>NZ 
+  <TR>
+    <TD>DEY
+    <TD>decrement Y index变址寄存器Y递减
+    <TD>Y--
+    <TD>NZ 
+  <TR>
+    <TD>INC
+    <TD>increment memory location指定的内存单元递增
+    <TD>M++
+    <TD>NZ 
+  <TR>
+    <TD>DEC
+    <TD>decrement memory location指定的内存单元递减
+    <TD>M--
+    <TD>NZ 
+  <TR>
+    <TD colSpan=4>
+      <P align=center style="TEXT-ALIGN: center"><B>移位操作</B> </P>
+  <TR>
+    <TD>ASL
+    <TD>arithmetic shift left, high bit into carry算术左移，高位移入进位标志
+    <TD>C&lt;--A7,A&lt;--(A&lt;&lt;1)
+    <TD>NZC 
+  <TR>
+    <TD>LSR
+    <TD>logical shift right, low bit into carry逻辑右移，低位移入进位标志
+    <TD>C&lt;--A0,A&lt;--(A&gt;&gt;1)
+    <TD>N=0 ZC 
+  <TR>
+    <TD>ROL
+    <TD>rotate left through carry通过进位标志循环左移
+    <TD>C&lt;--A7,A&lt;--((A&lt;&lt;1)+C)
+    <TD>NZC 
+  <TR>
+    <TD>ROR
+    <TD>rotate right through carry通过进位标志循环右移
+    <TD>C&lt;--A0,A&lt;--(A7=C+(A&gt;&gt;1))
+    <TD>NZC 
+  <TR>
+    <TD colSpan=4>
+      <P align=center style="TEXT-ALIGN: center"><B>逻辑操作</B> </P>
+  <TR>
+    <TD>AND
+    <TD>and accumulator与累加器
+    <TD>A&lt;--A&amp;M
+    <TD>NZ 
+  <TR>
+    <TD>ORA
+    <TD>or accumulator或累加器
+    <TD>A&lt;--A|M
+    <TD>NZ 
+  <TR>
+    <TD>EOR
+    <TD>exclusive-or accumulator异或累加器
+    <TD>A&lt;--A^M
+    <TD>NZ 
+  <TR>
+    <TD>BIT
+    <TD>test bits against accumulator测试累加器的某个位 (<A 
+      href="#InstructionNote1">1</A>)
+    <TD>Z&lt;--!(A&amp;M),N&lt;--M7,V&lt;--M6
+    <TD>N=M7 V=M6 Z 
+  <TR>
+    <TD>CMP
+    <TD>compare with accumulator与累加器比较
+    <TD>A-M--&gt;NZC
+    <TD>NZC 
+  <TR>
+    <TD>CPX
+    <TD>compare with X index与X变址寄存器比较
+    <TD>X-M--&gt;NZC
+    <TD>NZC 
+  <TR>
+    <TD>CPY
+    <TD>compare with Y index与Y变址寄存器比较
+    <TD>Y-M--&gt;NZC
+    <TD>NZC 
+  <TR>
+    <TD>TRB
+    <TD>test and reset bits对位进行测试和清除
+    <TD>
+    <TD>x 
+  <TR>
+    <TD>TSB
+    <TD>test and set bits对位进行测试和设置
+    <TD>
+    <TD>x 
+  <TR>
+    <TD>RMB
+    <TD>reset memory bit对内存位进行清除
+    <TD>
+    <TD>x 
+  <TR>
+    <TD>SMB
+    <TD>set memory bit对内存位进行设置
+    <TD>
+    <TD>x 
+  <TR>
+    <TD colSpan=4>
+      <P align=center style="TEXT-ALIGN: center"><B>算术操作</B> </P>
+  <TR>
+    <TD>ADC
+    <TD>add accumulator, with carry加累加器（带进位）
+    <TD>A&lt;--A+M+C
+    <TD>NZCV 
+  <TR>
+    <TD>SBC
+    <TD>subtract accumulator, with borrow减累加器（带借位）
+    <TD>A&lt;--A-M-~C
+    <TD>NZCV 
+  <TR>
+    <TD colSpan=4>
+      <P align=center style="TEXT-ALIGN: center"><B>流程控制 指令</B> </P>
+  <TR>
+    <TD>JMP
+    <TD>unconditional jump无条件跳转
+    <TD>PC&lt;--Address
+    <TD>- 
+  <TR>
+    <TD>JSR
+    <TD>jump Subroutine跳到子程序
+    <TD>Stack&lt;--PC,PC&lt;--Address
+    <TD>- 
+  <TR>
+    <TD>RTS
+    <TD>return from Subroutine由子程序返回
+    <TD>PC&lt;--Stack
+    <TD>- 
+  <TR>
+    <TD>RTI
+    <TD>return from Interrupt由中断返回
+    <TD>P&lt;--Stack,PC&lt;--Stack
+    <TD>From Stack 
+  <TR>
+    <TD>BRA
+    <TD>branch Always转移
+    <TD>PC=PC+offset
+    <TD>- 
+  <TR>
+    <TD>BEQ
+    <TD>branch on equal (zero set)相等(零标志被设置)时转移
+    <TD>if Z=1,PC+=offset
+    <TD>- 
+  <TR>
+    <TD>BNE
+    <TD>branch on not equal (zero clear)不相等(零标志被清除)时转移
+    <TD>if Z=0,PC+=offset
+    <TD>- 
+  <TR>
+    <TD>BCC
+    <TD>branch on carry clear进位标志被清除时转移(<A 
+      href="#InstructionNote2">2</A>)
+    <TD>if C=0,PC+=offset
+    <TD>- 
+  <TR>
+    <TD>BCS
+    <TD>branch on carry set进位标志被设置时转移(<A 
+      href="#InstructionNote2">2</A>)
+    <TD>if C=1,PC+=offset
+    <TD>- 
+  <TR>
+    <TD>BVC
+    <TD>branch on overflow clear溢出标志被清除时转移
+    <TD>if V=0,PC+=offset
+    <TD>- 
+  <TR>
+    <TD>BVS
+    <TD>branch on overflow set溢出标志被设置时转移
+    <TD>if V=1,PC+=offset
+    <TD>- 
+  <TR>
+    <TD>BMI
+    <TD>branch on minus负数时转移
+    <TD>if N=1,PC+=offset
+    <TD>- 
+  <TR>
+    <TD>BPL
+    <TD>branch on plus正数时转移
+    <TD>if N=0,PC+=offset
+    <TD>- 
+  <TR>
+    <TD>BBR
+    <TD>branch on bit reset (zero)某位被清除时转移
+    <TD>
+    <TD>- 
+  <TR>
+    <TD>BBS
+    <TD>branch on bit set (one)某位被设置时转移
+    <TD>
+    <TD>- 
+  <TR>
+    <TD colSpan=4>
+      <P align=center style="TEXT-ALIGN: center"><B>处理器状态指令</B> </P>
+  <TR>
+    <TD>CLC
+    <TD>clear carry flag清除进位标志
+    <TD>C&lt;--0
+    <TD>C=0 
+  <TR>
+    <TD>CLD
+    <TD>clear decimal mode清除十进制模式
+    <TD>D&lt;--0
+    <TD>D=0 
+  <TR>
+    <TD>CLI
+    <TD>clear interrupt disable bit清除中断禁用
+    <TD>I&lt;--0
+    <TD>I=0 
+  <TR>
+    <TD>CLV
+    <TD>clear overflow flag清除溢出标志
+    <TD>V&lt;--0
+    <TD>V=0 
+  <TR>
+    <TD>SEC
+    <TD>set carry flag进位标志
+    <TD>C&lt;--1
+    <TD>C=1 
+  <TR>
+    <TD>SED
+    <TD>set decimal mode十进制模式
+    <TD>C&lt;--1
+    <TD>D=1 
+  <TR>
+    <TD>SEI
+    <TD>set interrupt disable bit中断禁用
+    <TD>I&lt;--1
+    <TD>I=1 
+  <TR>
+    <TD colSpan=4>
+      <P align=center style="TEXT-ALIGN: center"><B>传送指令</B> </P>
+  <TR>
+    <TD>TAX
+    <TD>transfer accumulator to X index传送累加器到X变址寄存器
+    <TD>X&lt;--A
+    <TD>NZ 
+  <TR>
+    <TD>TAY
+    <TD>transfer accumulator to Y index传送累加器到Y变址寄存器
+    <TD>Y&lt;--A
+    <TD>NZ 
+  <TR>
+    <TD>TXA
+    <TD>transfer X index to accumulator传送X变址寄存器到累加器
+    <TD>A&lt;--X
+    <TD>NZ 
+  <TR>
+    <TD>TYA
+    <TD>transfer Y index to accumulator传送Y变址寄存器到累加器
+    <TD>A&lt;--Y
+    <TD>NZ 
+  <TR>
+    <TD colSpan=4>
+      <P align=center style="TEXT-ALIGN: center"><B>特殊指令</B> </P>
+  <TR>
+    <TD>NOP
+    <TD>no operation空操作
+    <TD>
+    <TD>- 
+  <TR>
+    <TD>BRK
+    <TD>force break强行中断
+    <TD>Stack&lt;--PC,PC&lt;--$FFFE
+    <TD>B=1 </TR></TBODY></TABLE>
+<P><B>注释：</B> 
+<OL type=1>
+  <LI><A name=InstructionNote1>这个</A>BIT指令拷贝bit 6到V标志，bit 7到N标志(例外的是在直接寻址模式的时候V 
+  &amp; N没有触及)。累加器和操作数进行与操作 ，Z标志将被适当地设置。（的说明：测试数如01…80应先被装入累加器，该指令应该不改变累加器)
+  <LI><A name=InstructionNote2>这个</A>BCC &amp; BCS指令：指令分别对应于BLT (大于时跳转) 和BGE 
+  (小于时跳转)。 <SPAN lang=EN-US></LI></OL>
+<P 
+style="MARGIN-LEFT: 18pt; mso-margin-top-alt: auto; mso-margin-bottom-alt: auto"> 
+
+<H2><A name=AddressingModes>寻址模式</A><SPAN 
+style="FONT-FAMILY: Verdana; mso-bookmark: AddressingModes"></H2>
+<P>一共有15种寻址模式，如下： <SPAN lang=EN-US>
+<P><B>隐式寻址 [隐式]</B> <B>Implied Addressing [Implied]<BR></B>在隐式寻址模式里， 
+包含操作数的地址被隐含在指令的操作码里。 
+<P><B>累加器寻址 [累加器]</B> <B>Accumulator Addressing 
+[Accumulator]<BR></B>这种寻址模式表现为只有一个操作数，另一个操作数隐含为累加器。 <SPAN lang=EN-US>
+<P><B>直接寻址 [直接]</B> <B>Immediate Addressing 
+[Immediate]<BR></B>在直接寻址模式里，操作数被包含在指令的第二个字节里，不需要其他内存寻址。 <SPAN lang=EN-US>
+<P><B>绝对寻址 [绝对]</B> <B>Absolute Addressing 
+[Absolute]<BR></B>在绝对寻址模式里，指令的第二个字节指定了有效地址的低八位，第三个字节指定高八位。因此，这种寻址模式允许访问全部的64K可寻址内存。 
+<SPAN lang=EN-US>
+<P><B>0页面寻址 [0页面]</B> <B>Zero Page Addressing [Zero 
+Page]<BR></B>0页面寻址允许只取指令的第二字节并假设高位地址为0，以得到较短的代码和执行时间。小心地使用0页面寻址能有效地增加代码的效率。 
+<SPAN lang=EN-US>
+<P><B>绝对变址寻址 [绝对,X 或 绝对,Y]</B> <B>Absolute Indexed Addressing [Absolute,X or 
+Absolute,Y]<BR></B>绝对变址寻址联合X或Y变址寄存器使用，以“绝对, X”和“绝对, 
+Y”的形式出现。有效地址由X或Y的内容加上指令的第二或第三字节包含的地址得到。这种模式允许变址寄存器包含变址或计数值而指令包含基址。这种寻址模式允许定位任何位置并且可以用变址修改多个地方，用以减少代码和指令时间。 
+
+<P><B>0页面变址寻址 [0页面,X 或 0页面,Y]</B> <B>Zero Page Indexed Addressing [Zero Page,X 
+or Zero Page,Y]<BR></B>0页面变址寻址联合X或Y变址寄存器使用，以“0页面, X”和“0页面, 
+Y”的形式出现。有效地址由指令的第二个字节加上变址寄存器的内容得到。因为这是一个“0页面”寻址，所以第二字节的内容定位于0页面。另外，因为“0页面”寻址模式的特性，所以不会有进位加到高位内存，也不会发生跨页边界的问题。 
+<SPAN lang=EN-US>
+<P><B>相对寻址 [相对]</B> <B>Relative Addressing 
+[Relative]<BR></B>相对寻址只用在转移（branch）指令指令中；它指定了条件转移的目标。指令的第二个字节变成一个操作数，作为偏移加到指向下一条指令的指令指针上。偏移范围从-128到127字节，相对于下一条指令。 
+
+<P><B>0页面变址间接寻址 [(0页面,X)]</B> <B>Zero Page Indexed Indirect Addressing [(Zero 
+Page,X)]<BR></B>0页面变址间接寻址（通常参考为 间接 
+X）指令的第二个字节加到X变址寄存器的内容上；进位被舍弃。加法运算的结果指向0页面的一个内存单元，而这个内存单元是有效地址的低8位。下一个0页面单元是有效地址的高8位。指向有效地址的高8位和低8位都必须在0页面内。 
+<SPAN lang=EN-US>
+<P><B>绝对变址间接寻址 [(绝对,X)]</B> <B>Absolute Indexed Indirect Addressing 
+[(Absolute,X)](只用在跳转（Jump）指令)</B> &nbsp;<BR>在绝对变址间接寻址中，指令的第二和第三字节的内容被加到X 
+寄存器。加法运算的结果指向一个内存单元，而这个内存单元是有效地址的低8位。下一个内存单元是有效地址的高8位。 <SPAN lang=EN-US>
+<P><B>变址间接寻址 [(0页面),Y]</B> <B>Indexed Indirect Addressing [(Zero 
+Page),Y]<BR></B>这种寻址通常参考为 
+间接,Y。指令的第二个字节指向0页面的一个内存单元，这个内存单元的内容被加到Y变址寄存器，结果是有效地址的低8位。加法的进位被加到0页面的下一个内存单元，结果是有效地址的高8位。 
+<SPAN lang=EN-US>
+<P><B>0页面间接寻址 [(0页面)]</B> <B>Zero Page Indirect Addressing [(Zero 
+Page)]<BR></B>在0页面间接寻址模式里，指令的第二个字节指向0页面的一个内存单元，单元的内容是有效地址的低8位，下一个0页面单元的内容是有效地址的高8位。 
+<SPAN lang=EN-US>
+<P><B>绝对间接寻址 [(Absolute)]</B> <B>Absolute Indirect Addressing 
+[(Absolute)](只用在跳转（Jump）指令)<BR></B>指令的第二个字节包含了一个内存单元的低8位地址，第三个字节包含了同一个内存单元的高8位地址。而这个内存单元是有效地址的低位，下一个内存单元是有效地址的高位，最后有效地址被装入16位的指令指针。 
+<SPAN lang=EN-US>
+<P><B>（pinokio的说明：[xxxx]表示地址为xxxx的内存数据，xxxx即指针；（yyyy）表示[yyyy]所指向的地址的内存数据，yyyy即指针的指针。下表中，#Oper表示以一个实际的数为操作数，其余为地址）</B> 
+
+<H2><A name=InstructionEncodings>指令编码</A><SPAN 
+style="FONT-FAMILY: Verdana; mso-bookmark: InstructionEncodings"></H2>
+<TABLE border=1 cellPadding=0 
+style="WIDTH: 100%; mso-cellspacing: 1.5pt; mso-padding-alt: 0cm 0cm 0cm 0cm" 
+width="100%">
+  <TBODY>
+  <TR>
+    <TD width="6%">
+      <P align=center style="TEXT-ALIGN: center"><B>助记符</B></P>
+    <TD width="26%">
+      <P align=center style="TEXT-ALIGN: center"><B>寻址模式</B></P>
+    <TD width="13%">
+      <P align=center style="TEXT-ALIGN: center"><B>形式</B> </P>
+    <TD width="15%"><p align="center"><strong>二进制</strong></p>
+    <TD width="16%">
+      <P align=center style="TEXT-ALIGN: center"><B>操作码</B></P>
+    <TD width="8%">
+      <P align=center style="TEXT-ALIGN: center"><B>指令长度</B></P>
+    <TD width="16%">
+      <P align=center style="TEXT-ALIGN: center"><B><SPAN lang=EN-US>CPU周期</B> 
+      </SPAN></P>
+  <TR>
+    <TD rowSpan=9 vAlign=top>ADC
+    <TD>Immediate直接
+    <TD>ADC #Oper
+    <td><div align="center">01101001</div></td>
+    <TD>69
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>Zero Page零页面
+    <TD>ADC Zpg
+    <td><div align="center">01100101</div></td>
+    <TD>65
+    <TD>2
+    <TD>3 
+  <TR>
+    <TD>Zero Page,X零页面,X
+    <TD>ADC Zpg,X
+    <td><div align="center">01110101</div></td>
+    <TD>75
+    <TD>2
+    <TD>4 
+  <TR>
+    <TD>Absolute绝对
+    <TD>ADC Abs
+    <td><div align="center">01101101</div></td>
+    <TD>6D
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD>Absolute,X绝对,X
+    <TD>ADC Abs,X
+    <td><div align="center">01111101</div></td>
+    <TD>7D
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD>Absolute,Y绝对,Y
+    <TD>ADC Abs,Y
+    <td><div align="center">01111001</div></td>
+    <TD>79
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD>(Zero Page,X)（零页面,X）
+    <TD>ADC (Zpg,X)
+    <td><div align="center">01100001</div></td>
+    <TD>61
+    <TD>2
+    <TD>6 
+  <TR>
+    <TD>(Zero Page),Y（零页面）,Y
+    <TD>ADC (Zpg),Y
+    <td><div align="center">01110001</div></td>
+    <TD>71
+    <TD>2
+    <TD>5 
+  <TR>
+    <TD>(Zero Page)（零页面）
+    <TD>ADC (Zpg)
+    <td><div align="center">01110010</div></td>
+    <TD>72
+    <TD>2
+    <TD>5 
+  <TR>
+    <TD rowSpan=9 vAlign=top>AND
+    <TD>Immediate直接
+    <TD>AND #Oper
+    <td><div align="center">00101001</div></td>
+    <TD>29
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>Zero Page零页面
+    <TD>AND Zpg
+    <td><div align="center">00100101</div></td>
+    <TD>25
+    <TD>2
+    <TD>3 
+  <TR>
+    <TD>Zero Page,X零页面,X
+    <TD>AND Zpg,X
+    <td><div align="center">00110101</div></td>
+    <TD>35
+    <TD>2
+    <TD>4 
+  <TR>
+    <TD>Absolute绝对
+    <TD>AND Abs
+    <td><div align="center">00101101</div></td>
+    <TD>2D
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD>Absolute,X绝对,X
+    <TD>AND Abs,X
+    <td><div align="center">00111101</div></td>
+    <TD>3D
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD>Absolute,Y绝对,Y
+    <TD>AND Abs,Y
+    <td><div align="center">00111001</div></td>
+    <TD>39
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD>(Zero Page,X)（零页面,X）
+    <TD>AND (Zpg,X)
+    <td><div align="center">00100001</div></td>
+    <TD>21
+    <TD>2
+    <TD>6 
+  <TR>
+    <TD>(Zero Page),Y（零页面）,Y
+    <TD>AND (Zpg),Y
+    <td><div align="center">00110001</div></td>
+    <TD>31
+    <TD>2
+    <TD>5 
+  <TR>
+    <TD>(Zero Page) （零页面）
+    <TD>AND (Zpg)
+    <td><div align="center">00110010</div></td>
+    <TD>32
+    <TD>2
+    <TD>5 
+  <TR>
+    <TD rowSpan=5 vAlign=top>ASL
+    <TD>accumulator累加器
+    <TD>ASL A
+    <td><div align="center">00001010</div></td>
+    <TD>0A
+    <TD>1
+    <TD>2 
+  <TR>
+    <TD>Zero Page零页面
+    <TD>ASL Zpg
+    <td><div align="center">00000110</div></td>
+    <TD>06
+    <TD>2
+    <TD>5 
+  <TR>
+    <TD>Zero Page,X零页面,X
+    <TD>ASL Zpg,X
+    <td><div align="center">00010110</div></td>
+    <TD>16
+    <TD>2
+    <TD>6 
+  <TR>
+    <TD>Absolute绝对
+    <TD>ASL Abs
+    <td><div align="center">00001110</div></td>
+    <TD>0E
+    <TD>3
+    <TD>6 
+  <TR>
+    <TD>Absolute,X绝对,X
+    <TD>ASL Abs,X
+    <td><div align="center">00011110</div></td>
+    <TD>1E
+    <TD>3
+    <TD>7 
+  <TR>
+    <TD>BBR0
+    <TD>Relative相对
+    <TD>BBR0 Oper
+    <td><div align="center">00001111</div></td>
+    <TD>0F
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>BBR1
+    <TD>Relative相对
+    <TD>BBR1 Oper
+    <td><div align="center">00011111</div></td>
+    <TD>1F
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>BBR2
+    <TD>Relative相对
+    <TD>BBR2 Oper
+    <td><div align="center">00101111</div></td>
+    <TD>2F
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>BBR3
+    <TD>Relative相对
+    <TD>BBR3 Oper
+    <td><div align="center">00111111</div></td>
+    <TD>3F
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>BBR4
+    <TD>Relative相对
+    <TD>BBR4 Oper
+    <td><div align="center">01001111</div></td>
+    <TD>4F
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>BBR5
+    <TD>Relative相对
+    <TD>BBR5 Oper
+    <td><div align="center">01011111</div></td>
+    <TD>5F
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>BBR6
+    <TD>Relative相对
+    <TD>BBR6 Oper
+    <td><div align="center">01101111</div></td>
+    <TD>6F
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>BBR7
+    <TD>Relative相对
+    <TD>BBR7 Oper
+    <td><div align="center">01111111</div></td>
+    <TD>7F
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>BBS0
+    <TD>Relative相对
+    <TD>BBS0 Oper
+    <td><div align="center">10001111</div></td>
+    <TD>8F
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>BBS1
+    <TD>Relative相对
+    <TD>BBS1 Oper
+    <td><div align="center">10011111</div></td>
+    <TD>9F
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>BBS2
+    <TD>Relative相对
+    <TD>BBS2 Oper
+    <td><div align="center">10101111</div></td>
+    <TD>AF
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>BBS3
+    <TD>Relative相对
+    <TD>BBS3 Oper
+    <td><div align="center">10111111</div></td>
+    <TD>BF
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>BBS4
+    <TD>Relative相对
+    <TD>BBS4 Oper
+    <td><div align="center">11001111</div></td>
+    <TD>CF
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>BBS5
+    <TD>Relative相对
+    <TD>BBS5 Oper
+    <td><div align="center">11011111</div></td>
+    <TD>DF
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>BBS6
+    <TD>Relative相对
+    <TD>BBS6 Oper
+    <td><div align="center">11101111</div></td>
+    <TD>EF
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>BBS7
+    <TD>Relative相对
+    <TD>BBS7 Oper
+    <td><div align="center">11111111</div></td>
+    <TD>FF
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>BCC
+    <TD>Relative相对
+    <TD>BCC Oper
+    <td><div align="center">10010000</div></td>
+    <TD>90
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>BCS
+    <TD>Relative相对
+    <TD>BCS Oper
+    <td><div align="center">10110000</div></td>
+    <TD>B0
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>BEQ
+    <TD>Relative相对
+    <TD>BEQ Oper
+    <td><div align="center">11110000</div></td>
+    <TD>F0
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD rowSpan=5 vAlign=top>BIT
+    <TD>Immediate直接
+    <TD>BIT #Oper
+    <td><div align="center">10001001</div></td>
+    <TD>89
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>Zero Page零页面
+    <TD>BIT Zpg
+    <td><div align="center">00100100</div></td>
+    <TD>24
+    <TD>2
+    <TD>3 
+  <TR>
+    <TD>Zero Page,X零页面,X
+    <TD>BIT Zpg,X
+    <td><div align="center">00110100</div></td>
+    <TD>34
+    <TD>2
+    <TD>4 
+  <TR>
+    <TD>Absolute绝对
+    <TD>BIT Abs
+    <td><div align="center">00101100</div></td>
+    <TD>2C
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD>Absolute,X绝对,X
+    <TD>BIT Abs,X
+    <td><div align="center">00111100</div></td>
+    <TD>3C
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD>BMI
+    <TD>Relative相对
+    <TD>BMI Oper
+    <td><div align="center">00110000</div></td>
+    <TD>30
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>BNE
+    <TD>Relative相对
+    <TD>BNE Oper
+    <td><div align="center">11010000</div></td>
+    <TD>D0
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>BPL
+    <TD>Relative相对
+    <TD>BPL Oper
+    <td><div align="center">00010000</div></td>
+    <TD>10
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>BRA
+    <TD>Relative相对
+    <TD>BRA Oper
+    <td><div align="center">10000000</div></td>
+    <TD>80
+    <TD>2
+    <TD>3 
+  <TR>
+    <TD>BRK
+    <TD>Implied隐含
+    <TD>BRK
+    <td><div align="center">00000000</div></td>
+    <TD>00
+    <TD>1
+    <TD>7 
+  <TR>
+    <TD>BVC
+    <TD>Relative相对
+    <TD>BVC Oper
+    <td><div align="center">01010000</div></td>
+    <TD>50
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>BVS
+    <TD>Relative相对
+    <TD>BVS Oper
+    <td><div align="center">01110000</div></td>
+    <TD>70
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>CLC
+    <TD>Implied隐含
+    <TD>CLC
+    <td><div align="center">00011000</div></td>
+    <TD>18
+    <TD>1
+    <TD>2 
+  <TR>
+    <TD>CLD
+    <TD>Implied隐含
+    <TD>CLD
+    <td><div align="center">11011000</div></td>
+    <TD>D8
+    <TD>1
+    <TD>2 
+  <TR>
+    <TD>CLI
+    <TD>Implied隐含
+    <TD>CLI
+    <td><div align="center">01011000</div></td>
+    <TD>58
+    <TD>1
+    <TD>2 
+  <TR>
+    <TD>CLV
+    <TD>Implied隐含
+    <TD>CLV
+    <td><div align="center">10111000</div></td>
+    <TD>B8
+    <TD>1
+    <TD>2 
+  <TR>
+    <TD rowSpan=9 vAlign=top>CMP
+    <TD>Immediate直接
+    <TD>CMP #Oper
+    <td><div align="center">11001001</div></td>
+    <TD>C9
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>Zero Page零页面
+    <TD>CMP Zpg
+    <td><div align="center">11000101</div></td>
+    <TD>C5
+    <TD>2
+    <TD>3 
+  <TR>
+    <TD>Zero Page,X零页面,X
+    <TD>CMP Zpg
+    <td><div align="center">11010101</div></td>
+    <TD>D5
+    <TD>2
+    <TD>4 
+  <TR>
+    <TD>Absolute绝对
+    <TD>CMP Abs
+    <td><div align="center">11001101</div></td>
+    <TD>CD
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD>Absolute,X绝对,X
+    <TD>CMP Abs,X
+    <td><div align="center">11011101</div></td>
+    <TD>DD
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD>Absolute,Y绝对,Y
+    <TD>CMP Abs,Y
+    <td><div align="center">11011001</div></td>
+    <TD>D9
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD>(Zero Page,X)( 零页面,X)
+    <TD>CMP (Zpg,X)
+    <td><div align="center">11000001</div></td>
+    <TD>C1
+    <TD>2
+    <TD>6 
+  <TR>
+    <TD>(Zero Page),Y(零页面),Y
+    <TD>CMP (Zpg),Y
+    <td><div align="center">11010001</div></td>
+    <TD>D1
+    <TD>2
+    <TD>5 
+  <TR>
+    <TD>(Zero Page) (零页面)
+    <TD>CMP (Zpg)
+    <td><div align="center">11010010</div></td>
+    <TD>D2
+    <TD>2
+    <TD>5 
+  <TR>
+    <TD rowSpan=3 vAlign=top>CPX
+    <TD>Immediate直接
+    <TD>CPX #Oper
+    <td><div align="center">11100000</div></td>
+    <TD>E0
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>Zero Page零页面
+    <TD>CPX Zpg
+    <td><div align="center">11100100</div></td>
+    <TD>E4
+    <TD>2
+    <TD>3 
+  <TR>
+    <TD>Absolute绝对
+    <TD>CPX Abs
+    <td><div align="center">11101100</div></td>
+    <TD>EC
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD rowSpan=3 vAlign=top>CPY
+    <TD>Immediate直接
+    <TD>CPY #Oper
+    <td><div align="center">11000000</div></td>
+    <TD>C0
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>Zero Page零页面
+    <TD>CPY Zpg
+    <td><div align="center">11000100</div></td>
+    <TD>C4
+    <TD>2
+    <TD>3 
+  <TR>
+    <TD>Absolute绝对
+    <TD>CPY Abs
+    <td><div align="center">11001100</div></td>
+    <TD>CC
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD>DEA
+    <TD>accumulator累加器
+    <TD>DEA
+    <td><div align="center">00111010</div></td>
+    <TD>3A
+    <TD>1
+    <TD>2 
+  <TR>
+    <TD rowSpan=4 vAlign=top>DEC
+    <TD>Zero Page<SPAN style="mso-spacerun: yes">&nbsp; 零页面</SPAN>
+    <TD>DEC Zpg
+    <td><div align="center">11000110</div></td>
+    <TD>C6
+    <TD>2
+    <TD>5 
+  <TR>
+    <TD>Zero Page,X<SPAN style="mso-spacerun: yes">&nbsp; 零页面,X</SPAN>
+    <TD>DEC Zpg,X
+    <td><div align="center">11010110</div></td>
+    <TD>D6
+    <TD>2
+    <TD>6 
+  <TR>
+    <TD>Absolute<SPAN style="mso-spacerun: yes">&nbsp; 绝对</SPAN>
+    <TD>DEC Abs
+    <td><div align="center">11001110</div></td>
+    <TD>CE
+    <TD>3
+    <TD>6 
+  <TR>
+    <TD>Absolute,X绝对,X
+    <TD>DEC Abs,X
+    <td><div align="center">11011110</div></td>
+    <TD>DE
+    <TD>3
+    <TD>7 
+  <TR>
+    <TD>DEX
+    <TD>Implied<SPAN style="mso-spacerun: yes">&nbsp; 隐含</SPAN>
+    <TD>DEX
+    <td><div align="center">11001010</div></td>
+    <TD>CA
+    <TD>1
+    <TD>2 
+  <TR>
+    <TD>DEY
+    <TD>Implied<SPAN style="mso-spacerun: yes">&nbsp; 隐含</SPAN>
+    <TD>DEY
+    <td><div align="center">10001000</div></td>
+    <TD>88
+    <TD>1
+    <TD>2 
+  <TR>
+    <TD rowSpan=9 vAlign=top>EOR
+    <TD>Immediate<SPAN style="mso-spacerun: yes">&nbsp; 直接</SPAN>
+    <TD>EOR #Oper
+    <td><div align="center">01001001</div></td>
+    <TD>49
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>Zero Page<SPAN style="mso-spacerun: yes">&nbsp; 零页面</SPAN>
+    <TD>EOR Zpg
+    <td><div align="center">01000101</div></td>
+    <TD>45
+    <TD>2
+    <TD>3 
+  <TR>
+    <TD>Zero Page,X<SPAN style="mso-spacerun: yes">&nbsp; 零页面,X</SPAN>
+    <TD>EOR Zpg,X
+    <td><div align="center">01010101</div></td>
+    <TD>55
+    <TD>2
+    <TD>4 
+  <TR>
+    <TD>Absolute<SPAN style="mso-spacerun: yes">&nbsp; 绝对</SPAN>
+    <TD>EOR Abs
+    <td><div align="center">01001101</div></td>
+    <TD>4D
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD>Absolute,X<SPAN style="mso-spacerun: yes">&nbsp; 绝对,X</SPAN>
+    <TD>EOR Abs,X
+    <td><div align="center">01011101</div></td>
+    <TD>5D
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD>Absolute,Y<SPAN style="mso-spacerun: yes">&nbsp; 绝对,Y</SPAN>
+    <TD>EOR Abs,Y
+    <td><div align="center">01011001</div></td>
+    <TD>59
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD>(Zero Page,X)<SPAN style="mso-spacerun: yes">&nbsp; (零页面,X)</SPAN>
+    <TD>EOR (Zpg,X)
+    <td><div align="center">01000001</div></td>
+    <TD>41
+    <TD>2
+    <TD>6 
+  <TR>
+    <TD>(Zero Page),Y<SPAN style="mso-spacerun: yes">&nbsp; (零页面),Y</SPAN>
+    <TD>EOR (Zpg),Y
+    <td><div align="center">01010001</div></td>
+    <TD>51
+    <TD>2
+    <TD>5 
+  <TR>
+    <TD>(Zero Page) (零页面)
+    <TD>EOR (Zpg)
+    <td><div align="center">01010010</div></td>
+    <TD>52
+    <TD>2
+    <TD>5 
+  <TR>
+    <TD>INA
+    <TD>accumulator累加器
+    <TD>INA
+    <td><div align="center">00011010</div></td>
+    <TD>1A
+    <TD>1
+    <TD>2 
+  <TR>
+    <TD rowSpan=4 vAlign=top>INC
+    <TD>Zero Page零页面
+    <TD>INC Zpg
+    <td><div align="center">11100110</div></td>
+    <TD>E6
+    <TD>2
+    <TD>5 
+  <TR>
+    <TD>Zero Page,X零页面,X
+    <TD>INC Zpg,X
+    <td><div align="center">11110110</div></td>
+    <TD>F6
+    <TD>2
+    <TD>6 
+  <TR>
+    <TD>Absolute绝对
+    <TD>INC Abs
+    <td><div align="center">11101110</div></td>
+    <TD>EE
+    <TD>3
+    <TD>6 
+  <TR>
+    <TD>Absolute,X绝对,X
+    <TD>INC Abs,X
+    <td><div align="center">11111110</div></td>
+    <TD>FE
+    <TD>3
+    <TD>7 
+  <TR>
+    <TD>INX
+    <TD>Implied隐含
+    <TD>INX
+    <td><div align="center">11101000</div></td>
+    <TD>E8
+    <TD>1
+    <TD>2 
+  <TR>
+    <TD>INY
+    <TD>Implied隐含
+    <TD>INY
+    <td><div align="center">11001000</div></td>
+    <TD>C8
+    <TD>1
+    <TD>2 
+  <TR>
+    <TD rowSpan=3 vAlign=top>JMP
+    <TD>Absolute绝对
+    <TD>JMP Abs
+    <td><div align="center">01001100</div></td>
+    <TD>4C
+    <TD>3
+    <TD>3 
+  <TR>
+    <TD>(Absolute) （绝对）
+    <TD>JMP (Abs)
+    <td><div align="center">01101100</div></td>
+    <TD>6C
+    <TD>3
+    <TD>5 
+  <TR>
+    <TD>(Absolute,X) （绝对,X）
+    <TD>JMP (Abs,X)
+    <td><div align="center">01111100</div></td>
+    <TD>7C
+    <TD>3
+    <TD>6 
+  <TR>
+    <TD>JSR
+    <TD>Absolute绝对
+    <TD>JSR Abs
+    <td><div align="center">00100000</div></td>
+    <TD>20
+    <TD>3
+    <TD>6 
+  <TR>
+    <TD rowSpan=9 vAlign=top>LDA
+    <TD>Immediate直接
+    <TD>LDA #Oper
+    <td><div align="center">10101001</div></td>
+    <TD>A9
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>Zero Page零页面
+    <TD>LDA Zpg
+    <td><div align="center">10100101</div></td>
+    <TD>A5
+    <TD>2
+    <TD>3 
+  <TR>
+    <TD>Zero Page,X零页面,X
+    <TD>LDA Zpg,X
+    <td><div align="center">10110101</div></td>
+    <TD>B5
+    <TD>2
+    <TD>4 
+  <TR>
+    <TD>Absolute绝对
+    <TD>LDA Abs
+    <td><div align="center">10101101</div></td>
+    <TD>AD
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD>Absolute,X绝对,X
+    <TD>LDA Abs,X
+    <td><div align="center">10111101</div></td>
+    <TD>BD
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD>Absolute,Y绝对,Y
+    <TD>LDA Abs,Y
+    <td><div align="center">10111001</div></td>
+    <TD>B9
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD>(Zero Page,X)(零页面,X)
+    <TD>LDA (Zpg,X)
+    <td><div align="center">10100001</div></td>
+    <TD>A1
+    <TD>2
+    <TD>6 
+  <TR>
+    <TD>(Zero Page),Y(零页面),Y
+    <TD>LDA (Zpg),Y
+    <td><div align="center">10110001</div></td>
+    <TD>B1
+    <TD>2
+    <TD>5 
+  <TR>
+    <TD>(Zero Page)(零页面)
+    <TD>LDA (Zpg)
+    <td><div align="center">10110010</div></td>
+    <TD>B2
+    <TD>2
+    <TD>5 
+  <TR>
+    <TD rowSpan=5 vAlign=top>LDX
+    <TD>Immediate直接
+    <TD>LDX #Oper
+    <td><div align="center">10100010</div></td>
+    <TD>A2
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>Zero Page零页面
+    <TD>LDX Zpg
+    <td><div align="center">10100110</div></td>
+    <TD>A6
+    <TD>2
+    <TD>3 
+  <TR>
+    <TD>Zero Page,Y 零页面,Y
+    <TD>LDX Zpg,Y
+    <td><div align="center">10110110</div></td>
+    <TD>B6
+    <TD>2
+    <TD>4 
+  <TR>
+    <TD>Absolute绝对
+    <TD>LDX Abs
+    <td><div align="center">10101110</div></td>
+    <TD>AE
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD>Absolute,Y绝对,Y
+    <TD>LDX Abs,Y
+    <td><div align="center">10111110</div></td>
+    <TD>BE
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD rowSpan=5 vAlign=top>LDY
+    <TD>Immediate直接
+    <TD>LDY #Oper
+    <td><div align="center">10100000</div></td>
+    <TD>A0
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>Zero Page零页面
+    <TD>LDY Zpg
+    <td><div align="center">10100100</div></td>
+    <TD>A4
+    <TD>2
+    <TD>3 
+  <TR>
+    <TD>Zero Page,Y 零页面,Y
+    <TD>LDY Zpg,X
+    <td><div align="center">10110100</div></td>
+    <TD>B4
+    <TD>2
+    <TD>4 
+  <TR>
+    <TD>Absolute绝对
+    <TD>LDY Abs
+    <td><div align="center">10101100</div></td>
+    <TD>AC
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD>Absolute,Y绝对,Y
+    <TD>LDY Abs,X
+    <td><div align="center">10111100</div></td>
+    <TD>BC
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD rowSpan=5 vAlign=top>LSR
+    <TD>accumulator累加器
+    <TD>LSR A
+    <td><div align="center">01001010</div></td>
+    <TD>4A
+    <TD>1
+    <TD>2 
+  <TR>
+    <TD>Zero Page 零页面
+    <TD>LSR Zpg
+    <td><div align="center">01000110</div></td>
+    <TD>46
+    <TD>2
+    <TD>5 
+  <TR>
+    <TD>Zero Page,X零页面,X
+    <TD>LSR Zpg,X
+    <td><div align="center">01010110</div></td>
+    <TD>56
+    <TD>2
+    <TD>6 
+  <TR>
+    <TD>Absolute绝对
+    <TD>LSR Abs
+    <td><div align="center">01001110</div></td>
+    <TD>4E
+    <TD>3
+    <TD>6 
+  <TR>
+    <TD>Absolute,X绝对,X
+    <TD>LSR Abs,X
+    <td><div align="center">01011110</div></td>
+    <TD>5E
+    <TD>3
+    <TD>7 
+  <TR>
+    <TD>NOP
+    <TD>Implied隐含
+    <TD>NOP
+    <td><div align="center">11101010</div></td>
+    <TD>EA
+    <TD>1
+    <TD>2 
+  <TR>
+    <TD rowSpan=9 vAlign=top>ORA
+    <TD>Immediate直接
+    <TD>ORA #Oper
+    <td><div align="center">00001001</div></td>
+    <TD>09
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>Zero Page零页面
+    <TD>ORA Zpg
+    <td><div align="center">00000101</div></td>
+    <TD>05
+    <TD>2
+    <TD>3 
+  <TR>
+    <TD>Zero Page,X零页面,X
+    <TD>ORA Zpg,X
+    <td><div align="center">00010101</div></td>
+    <TD>15
+    <TD>2
+    <TD>4 
+  <TR>
+    <TD>Absolute绝对
+    <TD>ORA Abs
+    <td><div align="center">00001101</div></td>
+    <TD>0D
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD>Absolute,X绝对,X
+    <TD>ORA Abs,X
+    <td><div align="center">00011101</div></td>
+    <TD>1D
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD>Absolute,Y绝对,Y
+    <TD>ORA Abs,Y
+    <td><div align="center">00011001</div></td>
+    <TD>19
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD>(Zero Page,X)(零页面,X)
+    <TD>ORA (Zpg,X)
+    <td><div align="center">00000001</div></td>
+    <TD>01
+    <TD>2
+    <TD>6 
+  <TR>
+    <TD>(Zero Page),Y(零页面),Y
+    <TD>ORA (Zpg),Y
+    <td><div align="center">00010001</div></td>
+    <TD>11
+    <TD>2
+    <TD>5 
+  <TR>
+    <TD>(Zero Page)(零页面)
+    <TD>ORA (Zpg)
+    <td><div align="center">00010010</div></td>
+    <TD>12
+    <TD>2
+    <TD>5 
+  <TR>
+    <TD>PHA
+    <TD>Implied隐含
+    <TD>PHA
+    <td><div align="center">01001000</div></td>
+    <TD>48
+    <TD>1
+    <TD>3 
+  <TR>
+    <TD>PHP
+    <TD>Implied隐含
+    <TD>PHP
+    <td><div align="center">00001000</div></td>
+    <TD>08
+    <TD>1
+    <TD>3 
+  <TR>
+    <TD>PHX
+    <TD>Implied隐含
+    <TD>PHX
+    <td><div align="center">11011010</div></td>
+    <TD>DA
+    <TD>1
+    <TD>3 
+  <TR>
+    <TD>PHY
+    <TD>Implied隐含
+    <TD>PHY
+    <td><div align="center">01011010</div></td>
+    <TD>5A
+    <TD>1
+    <TD>3 
+  <TR>
+    <TD>PLA
+    <TD>Implied隐含
+    <TD>PLA
+    <td><div align="center">01101000</div></td>
+    <TD>68
+    <TD>1
+    <TD>4 
+  <TR>
+    <TD>PLP
+    <TD>Implied隐含
+    <TD>PLP
+    <td><div align="center">00101000</div></td>
+    <TD>28
+    <TD>1
+    <TD>4 
+  <TR>
+    <TD>PLX
+    <TD>Implied隐含
+    <TD>PLX
+    <td><div align="center">11111010</div></td>
+    <TD>FA
+    <TD>1
+    <TD>4 
+  <TR>
+    <TD>PLY
+    <TD>Implied隐含
+    <TD>PLY
+    <td><div align="center">01111010</div></td>
+    <TD>7A
+    <TD>1
+    <TD>4 
+  <TR>
+    <TD rowSpan=5 vAlign=top>ROL
+    <TD>accumulator累加器
+    <TD>ROL A
+    <td><div align="center">00101010</div></td>
+    <TD>2A
+    <TD>1
+    <TD>2 
+  <TR>
+    <TD>Zero Page零页面
+    <TD>ROL Zpg
+    <td><div align="center">00100110</div></td>
+    <TD>26
+    <TD>2
+    <TD>5 
+  <TR>
+    <TD>Zero Page,X零页面,X
+    <TD>ROL Zpg,X
+    <td><div align="center">00110110</div></td>
+    <TD>36
+    <TD>2
+    <TD>6 
+  <TR>
+    <TD>Absolute绝对
+    <TD>ROL Abs
+    <td><div align="center">00101110</div></td>
+    <TD>2E
+    <TD>3
+    <TD>6 
+  <TR>
+    <TD>Absolute,X绝对,X
+    <TD>ROL Abs,X
+    <td><div align="center">00111110</div></td>
+    <TD>3E
+    <TD>3
+    <TD>7 
+  <TR>
+    <TD rowSpan=5 vAlign=top>ROR
+    <TD>accumulator累加器
+    <TD>ROR A
+    <td><div align="center">01101010</div></td>
+    <TD>6A
+    <TD>1
+    <TD>2 
+  <TR>
+    <TD>Zero Page零页面
+    <TD>ROR Zpg
+    <td><div align="center">01100110</div></td>
+    <TD>66
+    <TD>2
+    <TD>5 
+  <TR>
+    <TD>Zero Page,X零页面,X
+    <TD>ROR Zpg,X
+    <td><div align="center">01110110</div></td>
+    <TD>76
+    <TD>2
+    <TD>6 
+  <TR>
+    <TD>Absolute绝对
+    <TD>ROR Abs
+    <td><div align="center">01101110</div></td>
+    <TD>6E
+    <TD>3
+    <TD>6 
+  <TR>
+    <TD>Absolute,X绝对,X
+    <TD>ROR Abs,X
+    <td><div align="center">01111110</div></td>
+    <TD>7E
+    <TD>3
+    <TD>7 
+  <TR>
+    <TD>RTI
+    <TD>Implied隐含
+    <TD>RTI
+    <td><div align="center">01000000</div></td>
+    <TD>40
+    <TD>1
+    <TD>6 
+  <TR>
+    <TD>RTS
+    <TD>Implied隐含
+    <TD>RTS
+    <td><div align="center">01100000</div></td>
+    <TD>60
+    <TD>1
+    <TD>6 
+  <TR>
+    <TD rowSpan=9 vAlign=top>SBC
+    <TD>Immediate直接
+    <TD>SBC #Oper
+    <td><div align="center">11101001</div></td>
+    <TD>E9
+    <TD>2
+    <TD>2 
+  <TR>
+    <TD>Zero Page零页面
+    <TD>SBC Zpg
+    <td><div align="center">11100101</div></td>
+    <TD>E5
+    <TD>2
+    <TD>3 
+  <TR>
+    <TD>Zero Page,X零页面,X
+    <TD>SBC Zpg,X
+    <td><div align="center">11110101</div></td>
+    <TD>F5
+    <TD>2
+    <TD>4 
+  <TR>
+    <TD>Absolute绝对
+    <TD>SBC Abs
+    <td><div align="center">11101101</div></td>
+    <TD>ED
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD>Absolute,X绝对,X
+    <TD>SBC Abs,X
+    <td><div align="center">11111101</div></td>
+    <TD>FD
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD>Absolute,Y绝对,Y
+    <TD>SBC Abs,Y
+    <td><div align="center">11111001</div></td>
+    <TD>F9
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD>(Zero Page,X)(零页面,X)
+    <TD>SBC (Zpg,X)
+    <td><div align="center">11100001</div></td>
+    <TD>E1
+    <TD>2
+    <TD>6 
+  <TR>
+    <TD>(Zero Page),Y(零页面),Y
+    <TD>SBC (Zpg),Y
+    <td><div align="center">11110001</div></td>
+    <TD>F1
+    <TD>2
+    <TD>5 
+  <TR>
+    <TD>(Zero Page)(零页面)
+    <TD>SBC (Zpg)
+    <td><div align="center">11110010</div></td>
+    <TD>F2
+    <TD>2
+    <TD>5 
+  <TR>
+    <TD>SEC
+    <TD>Implied隐含
+    <TD>SEC
+    <td><div align="center">00111000</div></td>
+    <TD>38
+    <TD>1
+    <TD>2 
+  <TR>
+    <TD>SED
+    <TD>Implied隐含
+    <TD>SED
+    <td><div align="center">11111000</div></td>
+    <TD>F8
+    <TD>1
+    <TD>2 
+  <TR>
+    <TD>SEI
+    <TD>Implied隐含
+    <TD>SEI
+    <td><div align="center">01111000</div></td>
+    <TD>78
+    <TD>1
+    <TD>2 
+  <TR>
+    <TD rowSpan=8 vAlign=top>STA
+    <TD>Zero Page零页面
+    <TD>STA Zpg
+    <td><div align="center">10000101</div></td>
+    <TD>85
+    <TD>2
+    <TD>3 
+  <TR>
+    <TD>Zero Page,X零页面,X
+    <TD>STA Zpg,X
+    <td><div align="center">10010101</div></td>
+    <TD>95
+    <TD>2
+    <TD>4 
+  <TR>
+    <TD>Absolute绝对
+    <TD>STA Abs
+    <td><div align="center">10001101</div></td>
+    <TD>8D
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD>Absolute,X绝对,X
+    <TD>STA Abs,X
+    <td><div align="center">10011101</div></td>
+    <TD>9D
+    <TD>3
+    <TD>5 
+  <TR>
+    <TD>Absolute,Y绝对,Y
+    <TD>STA Abs,Y
+    <td><div align="center">10011001</div></td>
+    <TD>99
+    <TD>3
+    <TD>5 
+  <TR>
+    <TD>(Zero Page,X)(零页面,X)
+    <TD>STA (Zpg,X)
+    <td><div align="center">10000001</div></td>
+    <TD>81
+    <TD>2
+    <TD>6 
+  <TR>
+    <TD>(Zero Page),Y(零页面),Y
+    <TD>STA (Zpg),Y
+    <td><div align="center">10010001</div></td>
+    <TD>91
+    <TD>2
+    <TD>6 
+  <TR>
+    <TD>(Zero Page)(零页面)
+    <TD>STA (Zpg)
+    <td><div align="center">10010010</div></td>
+    <TD>92
+    <TD>2
+    <TD>5 
+  <TR>
+    <TD rowSpan=3 vAlign=top>STX
+    <TD>Zero Page零页面
+    <TD>STX Zpg
+    <td><div align="center">10000110</div></td>
+    <TD>86
+    <TD>2
+    <TD>3 
+  <TR>
+    <TD>Zero Page,Y 零页面,Y
+    <TD>STX Zpg,Y
+    <td><div align="center">10010110</div></td>
+    <TD>96
+    <TD>2
+    <TD>4 
+  <TR>
+    <TD>Absolute绝对
+    <TD>STX Abs
+    <td><div align="center">10001110</div></td>
+    <TD>8E
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD rowSpan=3 vAlign=top>STY
+    <TD>Zero Page零页面
+    <TD>STY Zpg
+    <td><div align="center">10000100</div></td>
+    <TD>84
+    <TD>2
+    <TD>3 
+  <TR>
+    <TD>Zero Page,X零页面,X
+    <TD>STY Zpg,X
+    <td><div align="center">10010100</div></td>
+    <TD>94
+    <TD>2
+    <TD>4 
+  <TR>
+    <TD>Absolute绝对
+    <TD>STY Abs
+    <td><div align="center">10001100</div></td>
+    <TD>8C
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD rowSpan=4 vAlign=top>STZ
+    <TD>Zero Page零页面
+    <TD>STZ Zpg
+    <td><div align="center">01100100</div></td>
+    <TD>64
+    <TD>2
+    <TD>3 
+  <TR>
+    <TD>Zero Page,X零页面,X
+    <TD>STZ Zpg,X
+    <td><div align="center">01110100</div></td>
+    <TD>74
+    <TD>2
+    <TD>4 
+  <TR>
+    <TD>Absolute绝对
+    <TD>STZ Abs
+    <td><div align="center">10011100</div></td>
+    <TD>9C
+    <TD>3
+    <TD>4 
+  <TR>
+    <TD>Absolute,X绝对,X
+    <TD>STZ Abs,X
+    <td><div align="center">10011110</div></td>
+    <TD>9E
+    <TD>3
+    <TD>5 
+  <TR>
+    <TD>TAX
+    <TD>Implied隐含
+    <TD>TAX
+    <td><div align="center">10101010</div></td>
+    <TD>AA
+    <TD>1
+    <TD>2 
+  <TR>
+    <TD>TAY
+    <TD>Implied隐含
+    <TD>TAY
+    <td><div align="center">10101000</div></td>
+    <TD>A8
+    <TD>1
+    <TD>2 
+  <TR>
+    <TD rowSpan=2 vAlign=top>TRB
+    <TD>Zero Page零页面
+    <TD>TRB Zpg
+    <td><div align="center">00010100</div></td>
+    <TD>14
+    <TD>2
+    <TD>5 
+  <TR>
+    <TD>Absolute绝对
+    <TD>TRB Abs
+    <td><div align="center">00011100</div></td>
+    <TD>1C
+    <TD>3
+    <TD>6 
+  <TR>
+    <TD rowSpan=2 vAlign=top>TSB
+    <TD>Zero Page零页面
+    <TD>TSB Zpg
+    <td><div align="center">00000100</div></td>
+    <TD>04
+    <TD>2
+    <TD>5 
+  <TR>
+    <TD>Absolute绝对
+    <TD>TSB Abs
+    <td><div align="center">00001100</div></td>
+    <TD>0C
+    <TD>3
+    <TD>6 
+  <TR>
+    <TD>TSX
+    <TD>Implied隐含
+    <TD>TSX
+    <td><div align="center">10111010</div></td>
+    <TD>BA
+    <TD>1
+    <TD>2 
+  <TR>
+    <TD>TXA
+    <TD>Implied隐含
+    <TD>TXA
+    <td><div align="center">10001010</div></td>
+    <TD>8A
+    <TD>1
+    <TD>2 
+  <TR>
+    <TD>TXS
+    <TD>Implied隐含
+    <TD>TXS
+    <td><div align="center">10011010</div></td>
+    <TD>9A
+    <TD>1
+    <TD>2 
+  <TR>
+    <TD>TYA
+    <TD>Implied隐含
+    <TD>TYA
+    <td><div align="center">10011000</div></td>
+    <TD>98
+    <TD>1
+    <TD>2 </TR></TBODY></TABLE>
+<p>&nbsp;</p>
+</DIV>
+</BODY></HTML>

@@ -1,0 +1,108 @@
+FC模拟器项目之PPU运行机制(中)
+FC模拟器项目之PPU运行机制(中) by JJ.Loki Loki.Chiang@gmail.com 
+
+五.帧渲染
+ ----------- 
+ 20 scanlines of vblank 
+ ----------- 
+ pre-render scanline 
+ ----------- 
+ 240 rendered scanlines 
+ ----------- 
+ 1 dummy scanline 
+ ----------- 
+ 
+    进入scanline 0的第一个PPU cc，PPU的VBL管脚产生逻辑0点平，可以保持20个PPU cc。 VBL与2A03 NMI管脚相连，从而产生NMI中断，每帧一次。通常软件会响应NMI中断，重设 通过内存映射的PPU寄存器，所以，事实上在软件的控制下，VBL保持逻辑0的时间小于一个scanline的时间。 
+
+   在pre-reder scanline的第304 PPU cc,Nes会使loopyV=loopyT(还有一次整个调整loopyV的内容的机会是在第二次写$2006时)，但在$2001.3和$2001.4都清空时，NES不会那样做。 
+
+   在每个scanline的第257 PPU cc,由HT,H菊花链构成的horizontal scroll counter(x-scroll register,也就是loopyV的第0-4位和第10位)会被他们各自的锁存器(也就是loopyT的第0-4位和第10位)的中的内容所替代，从而开始下个scanline的渲染。但在$2001.3和$2001.4都清空时，NES不会那样做。 
+
+六.NameTable,AttributeTable,PatternTable,SPR-RAM(OAM)
+   在理解scanline渲染之前，先把以上这些表搞清楚是非常有必要的。 
+
+1.存放的信息:
+  NameTable中存放了指向PatternTable中的Tile的索引值。
+  PatternTable中存放了8*8的Tile中每个象素的低2位图像信息。
+  AttributeTable中存放了8*8的Tile的高2位图像信息。
+  (所以1个8*8的Tile中每个象素用了4位长度，因此每个象素可以有16种颜色?其实不然，参见下文)
+  OAM中存放了SPRITE的各种属性信息，而真正的点阵信息存放在PT中.OAM不属于PPU的外部内存，也
+  不属于CPU的外部内存。 
+
+2.长度
+     NameTable中指向了32*30个8*8的tile，正好构成一屏幕图像。用一个字节来存放1个tile的索引，因此需要32*30=960=3C0H个字节。 
+
+     每个NameTable都有一个AttributeTable和他搭配,AT中的一个字节就存放了4*4个tile(8*8)的颜色值的高两位信息，屏幕一共需要32*20个tile，所以只需要8*5=40个字节就足够了，而任天堂给了AT共8*8=64=40H个字节。 
+
+  PatternTable中事实上存放了真正的tile点阵信息(但只存放了tile每个象素颜色的低2位信息，高2位需要到AttributeTable中去找)。1个tile为8*8个像素，1个像素两位宽，因此在PT中存放一个tile一共需要8*8*2/8=16个字节。1个PatternTable的长度为1000H=4096字节，因此一个PT共可以存放4096/16=256个tile。 
+
+  存放一个SPRITE共需要4个字节，OAM共有100H=256个字节，那就一共可以存放256/4=64个SPRITE的属性信息。 
+
+3.PT和AT之间的关系 
+
+  Pattern Table存放的每个tile是8*8大小的，如果用1个bit来表示一个像素，也就8个字节，但如果这样的话，那只能表示没有灰阶的图像，而NES的调色板中有16种颜色，因此4个bit来表示一个像素是最起码的。而如果这样做的话，对NES来说又太奢侈了，所以NES选择了将tile颜色的低2个bit存在Pattern Table中。就像这样：
+    Contents of                       Colour 
+   Pattern Table                      Result
+  ---------------                           --------
+  %00010000 = $10 --+                ...1....  Periods are used to rep-
+  %00000000 = $00   |                ..2.2...  resent colour 0. Numbers
+  %01000100 = $44   |                .3...3..  shown represent colour #.
+  %00000000 = $00   +-- Bit 0      2.....2.
+  %11111110 = $FE   |                1111111.
+  %00000000 = $00   |                2.....2.
+  %10000010 = $82   |                3.....3.
+  %00000000 = $00 --+                ........ 
+
+  %00000000 = $00 --+
+  %00101000 = $28   |
+  %01000100 = $44   |
+  %10000010 = $82   +-- Bit 1
+  %00000000 = $00   |
+  %10000010 = $82   |
+  %10000010 = $82   |
+  %00000000 = $00 --+
+  可以看出，在Pattern Table中存储一个tile需要16个字节，于是就有了下面的公式：
+  nTileAddr=(nTile * 16) + ScreenPatternTableAddress
+  ScreenPatternTableAddress是存储在$2000的PPU寄存器中的。 
+
+  tile颜色的高两位存在了Attribute Table中:
+  例如这样：
+ +---------------------------------+
+ |  Square 0  |  Square 1  |  #0-F represents an 8x8 tile
+ |   #0  #1   |   #4  #5   |
+ |   #2  #3   |   #6  #7   |  Square [x] represents four (4) 8x8 tiles
+ +---------------+----------------|   (i.e. a 16x16 pixel grid)
+ |  Square 2  |  Square 3  |
+ |   #8  #9   |   #C  #D   |
+ |   #A  #B   |   #E  #F   |
+ +--------------------------------+ 
+
+   Attribute Byte
+  ----------------
+     %00000000
+      +|+|+|+-- Upper two (2) colour bits for Square 0 (Tiles #0/1/2/3)
+       | | +--- Upper two (2) colour bits for Square 1 (Tiles #4/5/6/7)
+       | +----- Upper two (2) colour bits for Square 2 (Tiles #8/9/A/B)
+       +------- Upper two (2) colour bits for Square 3 (Tiles #C/D/E/F) 
+
+4.OAM(SPR-RAM)
+  SPRITE可以是8*8大小的也可以是8*16大小的。大多数游戏中的角色都是由多个SPRITE组成的，SPRITE的点阵信息存放在PT中，而属性信息(4bytes)存放在OAM中，OAM中一共可以存放64个SPRITE的属性信息。 
+
+4个字节的详细信息为:
+           +----------------------------------------------------------------------------------+
+           | Byte #  | Bits         | Description                                      |
+           +-----------+--------------+------------------------------------------------------|
+           |   0    | YYYYYYYY | Sprite Y coordinate - 1. Consider the   |
+           |        |                   | coordinate the upper-left corner of     |
+           |        |                   | the sprite itself.                                |
+           |   1    | IIIIIIII         | Sprite Tile Index #                            |
+           |   2    | vhp000cc    | Colour/Attributes                              |
+           |        |                   |  v = Vertical Flip   (1=Flip)                  |
+           |        |                   |  h = Horizontal Flip (1=Flip)                |
+           |        |                   |  p = Sprite Priority Bit                        |
+           |        |                   |         0 = Sprite on top of background |
+           |        |                   |         1 = Sprite behind background     |
+           |        |                   |  c = Upper two (2) bits of colour        |
+           |   3    | XXXXXXXX   | Sprite X coordinate (upper-left corner) |
+           +-----------------------------------------------------------------------------------+
+这些信息对PPU渲染scanline时是十分重要的。

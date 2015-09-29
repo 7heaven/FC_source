@@ -1,0 +1,95 @@
+FC模拟器项目之PPU运行机制(上)
+FC模拟器项目之PPU运行机制 by JJ.Loki Loki.Chiang@gmail.com 
+
+PPU要点： 
+
+一.PPU周期 
+
+1.系统时钟周期为21.48Mhz，PPU内部4分频为5.37Mhz。像素渲染频率也为5.37Mhz。
+  1 pixel需要1个PPU cc。
+  1 scanline需要341个PPU cc。
+  1 frame有262个scanline。so...1 frame需要262*341个ppu cc。 
+
+2.PPU访问VRAM(name/pattern tables,etc)的时间为2个PPU cc。
+  第一个时钟为地址准备，用锁存器锁存，第二个周期为读写周期。分时复用。 
+
+
+二.PPU寻址 
+
+名词:
+NT: name table
+AT: attribute/color table
+PT: pattern table
+FV: fine vertical scroll latch/counter
+FH: fine horizontal scroll latch
+VT: vertical tile index latch/counter
+HT: horizontal tile index latch/counter
+V: vertical name table selection latch/counter
+H: horizontal name table selection latch/counter
+S: playfield pattern table selection latch
+PAR: picture address register (as named in patent document)
+AR: tile attribute (palette select) value latch 
+
++--------------------+------------------------------------------------------------------------+ 
+|                     |+---+ +-+ +-+ +-----+ +-----+ +---+ +-+ +--------+ +--+| 
+|PPU registers   || FV| |V| |H| |   VT| |   HT| | FH| |S|  |   PAR|  |AR|| 
+|                     |+---+ +-+ +-+ +-----+ +-----+ +---+ +-+ +--------+ +--+| 
+|PPU counters  | |   |  |  | |   | |      |  |      |                                  | 
+|                     |+---+ +-+ +-+ +-----+ +-----+                                  | 
++--------------- ----+--------------------------------------------------------------- --------+ 
+
+  
+
+  以上的5个PPU counters就构成了LoopyV，而LoopyT就是上表中5个PPU counters上面的5个PPU register。 
+
+   PPU在渲染图像的过程中需要访问VRAM,或者通过$2007映射寄存器访问VRAM，这时LoopyV(由FV,V,H,VT,HT组成)会自动增加，如何增加取决于PPU正在做何种类型的VRAM访问。在以上提到的两种情况下，LoopV的增长方式是不同的。 
+
+注意：LoopyV实际被映射到了$2006，对$2006的第二次写入会改变LoopV的值. 
+
+1.通过2007访问VRAM时LoopyV如何增加？
+当$2002.2被清空时，HT,VT,H,V,FV(LoopyV)这5个计数器构成菊花链，所以每个计数器的进位控制着菊花链中接下来的一个计数器的时钟，从而构成一个异步的15位的计数器。每次读$2007时都会给HT计数器一个时钟脉冲，从而导致HT+1。 
+
+当$2002.2被设置时，HT,VT,H,V,FV这5个计数器依旧为菊花链连接，只是HT不再记数(不给时钟脉冲)，取而代之的是，每次读$2007时给VT一个时钟脉冲，从而使VT+1。 
+
+2.PPU渲染图像时，LoopyV如何增加？
+当$2001.3或$2001.4被打开的情况下，渲染20到260行scanline时，PPU内部建立了2个计数器。 
+
+第一个计数器叫做horizontal scroll counter，共6个bit。由HT,H计数器用菊花链连接而成，每渲染8个像素，HT计数一次(也就是8个PPU CC周期计数一次)。 
+
+第二个计数器叫做vertiacla scroll counter，共9个bit。由FV,VT,V用菊花链连接而成。FV以PPU的horizontal blanking脉冲作为时钟脉冲，这样每渲染完成1个scanline，FV+1。每当VT从29变为30时，VT产生进位脉冲，同时重置，这样做是避免把name table当作tile index数据读取。 
+
+三.5个计数器(LoopyV)如何更新？
+只有在两种情况下，LoopyV会被更新(更新为5个寄存器中的内容，也就是LoopyT)。 
+
+1.在第二次访问对$2006写入内容时: 
+
+具体为:
+2006 second write:
+t:0000000011111111=d:11111111
+v=t 
+
+
+2.在刚刚开始渲染第20 scanline的时候(在$2001.3和2003.4都被清空时不会发生)。
+具体为:
+v=t 
+
+还有一钟情况,在每个scanline的hblank时间内,H和HT计数器会用H和HT寄存器中的内容进行更新. 
+
+
+四.5个寄存器(LoopyT)如何更新?
+LoopyT并不是PPU真正用来读取Name Table的寄存器,它的值不会随渲染的过程而变化,LoopyV才是PPU真正用来读取Name Table的工具.详细参见loopy's docs explained. 
+
+2000 write:
+        t:0000110000000000=d:00000011
+2005 first write:
+        t:0000000000011111=d:11111000
+        x=d:00000111
+2005 second write:
+        t:0000001111100000=d:11111000
+        t:0111000000000000=d:00000111
+2006 first write:
+        t:0011111100000000=d:00111111
+        t:1100000000000000=0
+2006 second write:
+        t:0000000011111111=d:11111111
+        v=t
